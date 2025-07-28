@@ -1,0 +1,39 @@
+[project]
+name = "pose2blender"
+version = "0.1.0"
+description = "Python API for convertation 3D skeletons from points cloud to Blender animation"
+readme = "README.md"
+requires-python = "==3.10.9"
+dependencies = [
+    "torch==2.7.1",
+    "torchvision==0.22.1",
+    "torchaudio==2.7.1",
+    "ffmpegcv[cuda]==0.3.18",
+    "mmdet==3.3.0",
+    "opencv-python==4.8.1.78",
+    "numpy==1.23.5",
+    "kornia==0.8.1",
+    "pandas==2.3.1",
+    "pre-commit",
+    "setuptools==79.0.1",
+    "mmengine==0.10.7"
+]
+
+[project.optional-dependencies]
+sapiens = [
+    "sapiens-pretrain @ git+https://github.com/facebookresearch/sapiens.git#subdirectory=pretrain",
+    "sapiens-pose @ git+https://github.com/facebookresearch/sapiens.git#subdirectory=pose"
+]
+
+[tool.uv]
+default-groups = "all"
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu128" }]
+torchvision = [{ index = "pytorch-cu128" }]
+torchaudio = [{ index = "pytorch-cu128" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
