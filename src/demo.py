@@ -76,6 +76,11 @@ if __name__ == "__main__":
     args = get_arguments()
 
     if args.pose_checkpoints.endswith(".pth"):
+        import mmengine.runner.checkpoint
+        def patched_load_checkpoint(filename, map_location=None, logger=None): # noqa: ARG001, ANN001, ANN201
+            return torch.load(filename, map_location=map_location, weights_only=False)
+        mmengine.runner.checkpoint._load_checkpoint = patched_load_checkpoint # noqa: SLF001
+
         pose_estimator = init_pose_estimator(
             args.pose_config,
             args.pose_checkpoints,
