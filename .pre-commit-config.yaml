@@ -15,7 +15,7 @@ repos:
         args:
           - --fix
           - --select=ALL
-          - --ignore=D100,D101,D102,D103,D105,D107,ERA001,EM101,EM102,TRY002,TRY003,UP006,UP035
+          - --ignore=D100,D101,D102,D103,D105,D107,D205,ERA001,EM101,EM102,TRY002,TRY003,UP006,UP035,INP001,G004,BLE001
           - --line-length=120
           - --exclude=.venv,configs
           - --target-version=py310

@@ -13,7 +13,10 @@ from mmpose.apis import init_model as init_pose_estimator
 from mmpose.visualization.fast_visualizer import FastVisualizer
 from tqdm import tqdm
 
-from classes_and_palettes import (
+from src.model.executor import inference_topdown
+from src.model.preprocess import PosePreprocessor
+from src.utils.adapters import GPUArray, pycuda_context_reset, visualizer_adapter
+from src.utils.palettes import (
     COCO_KPTS_COLORS,
     COCO_SKELETON_INFO,
     COCO_WHOLEBODY_KPTS_COLORS,
@@ -21,9 +24,6 @@ from classes_and_palettes import (
     GOLIATH_KPTS_COLORS,
     GOLIATH_SKELETON_INFO,
 )
-from executor import inference_topdown
-from preprocess import PosePreprocessor
-from utils import GPUArray, pycuda_context_reset, visualizer_adapter
 
 
 def get_arguments() -> Namespace:
