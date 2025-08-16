@@ -13,7 +13,7 @@ def parse_arguments() -> Namespace:
                         default="../../configs/sapiens_pose/goliath/sapiens_0.3b-210e_goliath-1024x768.py",
                         help="Path to configuration file.")
     parser.add_argument("--pose_checkpoints",
-                        default="../../checkpoints/goliath/sapiens_0.3b/sapiens_0.3b_goliath_best_goliath_AP_573.pth",
+                        default="../../weights/goliath/sapiens_0.3b/sapiens_0.3b_goliath_best_goliath_AP_573.pth",
                         help="Path to PyTorch weights file.")
     return parser.parse_args()
 

@@ -1,18 +1,16 @@
-import urllib.request
 from argparse import Namespace
-from typing import Tuple
-
 import cv2
-import numpy as np
-import torch
 from deploy2serve.deployment.core.executors.factory import ExtendExecutor
 from deploy2serve.deployment.models.export import ExportConfig
 from deploy2serve.utils.logger import get_project_root
+import numpy as np
 from mmpose.visualization.fast_visualizer import FastVisualizer
+import torch
+from typing import Tuple, Optional
+import urllib.request
 
 from src.model.postprocess import udp_decode
 from src.model.preprocess import PosePreprocessor
-from src.utils.adapters import visualizer_adapter
 from src.visualization.palettes import (
     COCO_KPTS_COLORS,
     COCO_SKELETON_INFO,
@@ -21,14 +19,15 @@ from src.visualization.palettes import (
     GOLIATH_KPTS_COLORS,
     GOLIATH_SKELETON_INFO,
 )
+from src.utils.adapters import visualizer_adapter
 
 
 class SapiensExecutor(ExtendExecutor):
     def __init__(self, config: ExportConfig) -> None:
         super().__init__(config)
-        self.batched_data: torch.Tensor | None = None
-        self.scales: torch.Tensor | None = None
-        self.centers: torch.Tensor | None = None
+        self.batched_data: Optional[torch.Tensor] = None
+        self.scales: Optional[torch.Tensor] = None
+        self.centers: Optional[torch.Tensor] = None
 
         self.dtype = torch.float16 if self.config.enable_mixed_precision else torch.float32
         shape: Tuple[int, int] = self.config.input_shape[::-1] # type: ignore[attr-defined]
@@ -58,7 +57,7 @@ class SapiensExecutor(ExtendExecutor):
             try:
                 image_path.parent.mkdir(exist_ok=True, parents=True)
                 urllib.request.urlretrieve(image_url, image_path) # noqa: S310
-            except Exception:
+            except (Exception, ):
                 self.logger.warning(f"Demo file is not exist: {image_path}, skip visualization step")
                 return
 

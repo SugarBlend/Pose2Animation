@@ -1,23 +1,21 @@
-import mimetypes
 from argparse import ArgumentParser, Namespace
-from itertools import count
-from pathlib import Path
-
-import pickle
+from colorama import Fore, Style
 import cv2
 import ffmpegcv
+from pathlib import Path
+import pickle
 import numpy as np
-import torch
-import yaml
-from colorama import Fore, Style
 from mmcv.visualization.image import imshow_det_bboxes
-from mmpose.apis import init_model as init_pose_estimator
+from mmengine.config import Config
 from mmpose.visualization.fast_visualizer import FastVisualizer
+import mimetypes
+from itertools import count
+import yaml
+import torch
 from tqdm import tqdm
+from typing import Optional, Type, Union, Tuple, List
 
-from src.model.executor import inference_topdown
-from src.model.preprocess import PosePreprocessor
-from src.utils.adapters import GPUArray, pycuda_context_reset, visualizer_adapter
+from src.model.interface import SapiensEnd2End, Backend
 from src.visualization.palettes import (
     COCO_KPTS_COLORS,
     COCO_SKELETON_INFO,
@@ -26,6 +24,7 @@ from src.visualization.palettes import (
     GOLIATH_KPTS_COLORS,
     GOLIATH_SKELETON_INFO,
 )
+from src.utils.adapters import GPUArray, pycuda_context_reset, visualizer_adapter
 
 
 def get_arguments() -> Namespace:
@@ -34,11 +33,13 @@ def get_arguments() -> Namespace:
                         default="../configs/sapiens_pose/goliath/sapiens_0.3b-210e_goliath-1024x768.py",
                         help="Config for pose estimator.")
     parser.add_argument("--pose_checkpoints",
-                        default="../checkpoints/goliath/sapiens_0.3b/sapiens_0.3b_goliath_best_goliath_AP_573.pth",
+                        default="../weights/goliath/sapiens_0.3b/tensorrt/sapiens_0.3b_goliath_best_goliath_AP_573.plan",
+                        # default="../weights/goliath/sapiens_0.3b/torchscript/sapiens_0.3b_goliath_best_goliath_AP_573.pt",
+                        # default="../weights/goliath/sapiens_0.3b/onnx/sapiens_0.3b_goliath_best_goliath_AP_573.onnx",
                         help="Checkpoints for pose estimator.")
-    parser.add_argument("--input_file", default="../resources/demo.mp4",
+    parser.add_argument("--input_file", default=r"D:\Datasets\CHI3D\chi3d_train\train\s02\videos\50591643\Grab 1.mp4",
                         help="Path to video file for pose estimation.")
-    parser.add_argument("--detections_file", default="../resources/detections.yml",
+    parser.add_argument("--detections_file", default=r"E:\Projects\SapiensBlender\src\dump\dataset_couple\50591643_Grab 1.yml",
                         help="Path to video file for pose estimation.")
     parser.add_argument("--device", default="cuda:0",
                         help="Execution device in pytorch")
@@ -74,30 +75,9 @@ def get_arguments() -> Namespace:
     return args
 
 
-if __name__ == "__main__":
-    args = get_arguments()
-
-    if args.pose_checkpoints.endswith(".pth"):
-        import mmengine.runner.checkpoint
-        def patched_load_checkpoint(filename, map_location=None, logger=None): # noqa: ARG001, ANN001, ANN201
-            return torch.load(filename, map_location=map_location, weights_only=False)
-        mmengine.runner.checkpoint._load_checkpoint = patched_load_checkpoint # noqa: SLF001
-
-        pose_estimator = init_pose_estimator(
-            args.pose_config,
-            args.pose_checkpoints,
-            device=args.device,
-        )
-        pose_estimator.eval()
-        pose_estimator.to(args.device)
-        pose_estimator.to(args.precision)
-        model = torch.compile(pose_estimator, mode="reduce-overhead", fullgraph=True)
-        model.test_cfg.flip_test = False
-        model_cfg = model.cfg
-    else:
-        raise Exception("At now implemented only general PyTorch model format processing.")
-    preprocessor = PosePreprocessor(model_cfg.image_size, model.data_preprocessor.mean, model.data_preprocessor.std)
-
+def setting_multimedia(args: Namespace) -> Tuple[
+    Union[cv2.VideoCapture, ffmpegcv.toCUDA], Optional[FastVisualizer], Optional[cv2.VideoWriter], tqdm
+]:
     if args.use_ffmpegcv:
         with pycuda_context_reset():
             cap = ffmpegcv.toCUDA(ffmpegcv.VideoCaptureNV(str(args.input_file), pix_fmt="nv12"))
@@ -106,21 +86,30 @@ if __name__ == "__main__":
         cap = cv2.VideoCapture(str(args.input_file))
         frames_number = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 1
 
+    custom_format = (
+        f"{Fore.WHITE}{{desc}}: {{percentage:2.0f}}% |{{bar}}| {{n_fmt}}/{{total_fmt}} [{{elapsed}}<{{remaining}}, "
+        f"{{rate_fmt}}]{Style.RESET_ALL}"
+    )
+    progress_bar = tqdm(count(), total=frames_number, bar_format=custom_format, position=0, leave=True,
+                       ascii=" ▁▂▃▄▅▆▇█", ncols=70)
+
+    visualizer: Optional[FastVisualizer] = None
     if args.visualize:
-        if model_cfg.num_keypoints == 308:  # noqa: PLR2004
+        if pipeline.model_configuration.num_keypoints == 308:  # noqa: PLR2004
             skeleton_info, pts_colors = GOLIATH_SKELETON_INFO, GOLIATH_KPTS_COLORS
-        elif model_cfg.num_keypoints == 133:  # noqa: PLR2004
+        elif pipeline.model_configuration.num_keypoints == 133:  # noqa: PLR2004
             skeleton_info, pts_colors = COCO_WHOLEBODY_SKELETON_INFO, COCO_WHOLEBODY_KPTS_COLORS
-        elif model_cfg.num_keypoints == 17:  # noqa: PLR2004
+        elif pipeline.model_configuration.num_keypoints == 17:  # noqa: PLR2004
             skeleton_info, pts_colors = COCO_SKELETON_INFO, COCO_KPTS_COLORS
         else:
             raise Exception("Model configure consider unsupported number of keypoints to "
-                            f"visualization: {model_cfg.num_keypoints}")
+                            f"visualization: {pipeline.model_configuration.num_keypoints}")
 
         meta_info = visualizer_adapter(skeleton_info, pts_colors)
         visualizer = FastVisualizer(meta_info, radius=3, line_width=1, kpt_thr=0.3)
         cv2.namedWindow("Visualization", cv2.WINDOW_GUI_EXPANDED)
 
+    writer: Optional[cv2.VideoWriter] = None
     if args.output_file:
         ret, img = cap.read()
         if isinstance(img, np.ndarray):
@@ -136,49 +125,51 @@ if __name__ == "__main__":
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(output_file), fourcc, 60, (w, h))
 
-    with args.detections_file.open(mode="rb") as file:
-        data = yaml.safe_load(file)
+    return cap, visualizer, writer, progress_bar
 
-    custom_format = (
-        f"{Fore.WHITE}{{desc}}: {{percentage:2.0f}}% |{{bar}}| {{n_fmt}}/{{total_fmt}} [{{elapsed}}<{{remaining}}, "
-        f"{{rate_fmt}}]{Style.RESET_ALL}"
-    )
+
+if __name__ == "__main__":
+    args = get_arguments()
+    pipeline = SapiensEnd2End(args.pose_checkpoints, args.pose_config, "cuda:0")
+    pipeline.init_executor()
+    cap, visualizer, writer, progress_bar = setting_multimedia(args)
+
+    with args.detections_file.open(mode="rb") as file:
+        frames_detections = yaml.safe_load(file)
+
     detection_thresh = 0.4
     class_thresh = 0
 
-    frame_joints = []
-    for i in tqdm(count(), total=frames_number, bar_format=custom_format, position=0, leave=True, ascii=" ▁▂▃▄▅▆▇█",
-                  ncols=70):
+    frame_joints: List[np.ndarray] = []
+    for idx in progress_bar:
         if args.use_ffmpegcv:
-            ret, torch_tensor = cap.read_torch()
-            if not ret:
-                break
+            ret, frame = cap.read_torch()
         else:
-            ret, img = cap.read()
-            if not ret:
-                break
-            torch_tensor = torch.from_numpy(img).cuda().to(torch.float32).permute(2, 0, 1)
+            ret, frame = cap.read()
+        if not ret:
+            break
 
-        detections = np.asarray(data[i])
+        if isinstance(frame, np.ndarray):
+            frame = torch.from_numpy(frame).cuda().to(torch.float32).permute(2, 0, 1)
+
+        detections = np.asarray(frames_detections[idx])
         detections = detections[detections[:, 4] > detection_thresh]
         detections = detections[detections[:, 5] == class_thresh]
 
         if np.prod(detections.shape):
             bboxes = torch.tensor(detections[:, :4], dtype=torch.float32, device=args.device)
-            batched_data, centers, scales = preprocessor(img=torch_tensor, bboxes=bboxes)
-            predictions = inference_topdown(model, batched_data.to(args.precision).contiguous())
-            for j, prediction in enumerate(predictions):
-                prediction.keypoints = ((prediction.keypoints / preprocessor.input_shape) * scales[j] + centers[j] -
-                                        0.5 * scales[j])
+            pipeline.preprocess(frame, bboxes)
+            output = pipeline.infer(asynchronous=False)[0]
+            joints, keypoint_scores = pipeline.postprocess(output)
         else:
-            predictions = []
-
-        frame_joints.append(np.concatenate([predictions[0].keypoints, predictions[0].keypoint_scores.reshape(1, -1, 1)], axis=-1))
+            joints, keypoint_scores = [], []
+        frame_joints.append(np.concatenate([joints, keypoint_scores], axis=-1))
 
         if args.visualize or args.output_file:
-            img = np.ascontiguousarray(torch_tensor.permute(1, 2, 0).to(torch.uint8).cpu().numpy())
-
+            img = np.ascontiguousarray(frame.permute(1, 2, 0).to(torch.uint8).cpu().numpy())
             if args.visualize:
+                predictions = [Config({"keypoints": joints[i: i + 1], "keypoint_scores": keypoint_scores[i: i + 1]})
+                               for i in range(joints.shape[0])]
                 imshow_det_bboxes(
                     img, detections[:, :5], labels=detections[:, 5].astype(np.int32), class_names=["person"],
                     bbox_color=(0, 165, 255), text_color="blue", font_scale=0.5, thickness=3, show=False
@@ -192,7 +183,8 @@ if __name__ == "__main__":
                 writer.write(img)
 
     args.detections_file = Path(args.detections_file)
-    output_file = f"{args.detections_file.parent.joinpath(args.detections_file.stem)}_skeleton_{model_cfg.num_keypoints}.pkl"
+    num_joints = pipeline.model_configuration.num_keypoints
+    output_file = f"{args.detections_file.parent.joinpath(args.detections_file.stem)}_skeleton_{num_joints}.pkl"
     with open(output_file, "wb") as pkl_file:
         pickle.dump(frame_joints, pkl_file)
     cap.release()
