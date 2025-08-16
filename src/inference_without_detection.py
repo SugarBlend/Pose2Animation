@@ -13,9 +13,9 @@ from itertools import count
 import yaml
 import torch
 from tqdm import tqdm
-from typing import Optional, Type, Union, Tuple, List
+from typing import Optional, Union, Tuple, List
 
-from src.model.interface import SapiensEnd2End, Backend
+from src.model.interface import SapiensEnd2End
 from src.visualization.palettes import (
     COCO_KPTS_COLORS,
     COCO_SKELETON_INFO,
@@ -34,12 +34,10 @@ def get_arguments() -> Namespace:
                         help="Config for pose estimator.")
     parser.add_argument("--pose_checkpoints",
                         default="../weights/goliath/sapiens_0.3b/tensorrt/sapiens_0.3b_goliath_best_goliath_AP_573.plan",
-                        # default="../weights/goliath/sapiens_0.3b/torchscript/sapiens_0.3b_goliath_best_goliath_AP_573.pt",
-                        # default="../weights/goliath/sapiens_0.3b/onnx/sapiens_0.3b_goliath_best_goliath_AP_573.onnx",
                         help="Checkpoints for pose estimator.")
-    parser.add_argument("--input_file", default=r"D:\Datasets\CHI3D\chi3d_train\train\s02\videos\50591643\Grab 1.mp4",
+    parser.add_argument("--input_file", default=r"...",
                         help="Path to video file for pose estimation.")
-    parser.add_argument("--detections_file", default=r"E:\Projects\SapiensBlender\src\dump\dataset_couple\50591643_Grab 1.yml",
+    parser.add_argument("--detections_file", default=r"...",
                         help="Path to video file for pose estimation.")
     parser.add_argument("--device", default="cuda:0",
                         help="Execution device in pytorch")
@@ -185,6 +183,6 @@ if __name__ == "__main__":
     args.detections_file = Path(args.detections_file)
     num_joints = pipeline.model_configuration.num_keypoints
     output_file = f"{args.detections_file.parent.joinpath(args.detections_file.stem)}_skeleton_{num_joints}.pkl"
-    with open(output_file, "wb") as pkl_file:
-        pickle.dump(frame_joints, pkl_file)
+    with open(output_file, "wb") as skeleton_file:
+        pickle.dump(frame_joints, skeleton_file)
     cap.release()

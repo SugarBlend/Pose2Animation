@@ -9,7 +9,7 @@ def linear_triangulation(
     points: List[np.ndarray]
 ) -> np.ndarray:
     proj_matrices = np.asarray(proj_matrices)
-    points = np.asarray(points)
+    points = np.asarray(points)[:, :, :2]
     a1 = points[:, :, :1] * proj_matrices[:, 2, :] - proj_matrices[:, 0, :]
     a2 = points[:, :, 1:] * proj_matrices[:, 2, :] - proj_matrices[:, 1, :]
     stacked = np.stack((a1, a2), axis=2)
