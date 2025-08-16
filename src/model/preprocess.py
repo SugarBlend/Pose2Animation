@@ -1,9 +1,8 @@
 import math
-from typing import Tuple
-
 import kornia
 import numpy as np
 import torch
+from typing import Tuple
 
 
 class PosePreprocessor:

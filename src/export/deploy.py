@@ -27,13 +27,13 @@ if __name__ == "__main__":
     args = parse_arguments()
     config = ExportConfig.from_file(args.deploy_config)
 
-    exporter = get_object(config.exporter.module, config.exporter.cls)(config)
+    exporter = get_object(config.exporter.module_path, config.exporter.class_name)(config)
 
     if not Path(config.torch_weights).is_absolute():
         config.torch_weights = str(root.joinpath(config.torch_weights))
 
     exporter.load_checkpoints(args.pose_config, args.pose_checkpoints)
-    executor = get_object(config.executor.module, config.executor.cls)(config)
+    executor = get_object(config.executor.module_path, config.executor.class_name)(config)
 
     for backend in config.formats:
         exporter.convert(backend)

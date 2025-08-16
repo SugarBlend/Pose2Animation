@@ -1,12 +1,42 @@
-from typing import Any
-
-import mmengine.runner.checkpoint
-import tensorrt as trt
-import torch
+from contextlib import contextmanager
+from deploy2serve.deployment.core.exporters.backends.onnx_format import ONNXExporter
+from deploy2serve.deployment.core.exporters.backends.tensorrt_format import TensorRTExporter, ExporterFactory, Backend
+from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
 from deploy2serve.deployment.core.exporters.factory import Exporter
 from deploy2serve.deployment.models.export import ExportConfig
 from deploy2serve.utils.logger import get_logger
+import mmengine.runner.checkpoint
 from mmpose.apis import init_model as init_pose_estimator
+import tensorrt as trt
+import torch
+from typing import Any, Generator, Optional, Type
+
+from src.export.batcher import PoseBatcher
+
+
+@ExporterFactory.register(Backend.ONNX)
+class OverrideONNX(ONNXExporter):
+    def __init__(self, config: ExportConfig, model: torch.nn.Module) -> None:
+        super().__init__(config, model)
+
+    @contextmanager
+    def patch_ops(self) -> Generator[None, Any, None]:
+        yield
+
+    def register_onnx_plugins(self) -> Any:
+        pass
+
+
+@ExporterFactory.register(Backend.TensorRT)
+class OverrideTensorRT(TensorRTExporter):
+    def __init__(self, config: ExportConfig, model: torch.nn.Module) -> None:
+        super().__init__(config, model)
+
+    def register_batcher(self) -> Optional[Type[BaseBatcher]]:
+        return PoseBatcher(self.config, "sapiens", self.config.input_shape, self.model.cfg)
+
+    def register_tensorrt_plugins(self, network: trt.INetworkDefinition) -> trt.INetworkDefinition:
+        return network
 
 
 class SapiensExporter(Exporter):
@@ -26,9 +56,3 @@ class SapiensExporter(Exporter):
         model.to(dtype)
         model.test_cfg.flip_test = False
         self.model = model
-
-    def register_tensorrt_plugins(self, network: trt.INetworkDefinition) -> trt.INetworkDefinition: # type: ignore[attr-defined]
-        return network
-
-    def register_onnx_plugins(self) -> None:
-        pass

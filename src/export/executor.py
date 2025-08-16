@@ -13,7 +13,7 @@ from mmpose.visualization.fast_visualizer import FastVisualizer
 from src.model.postprocess import udp_decode
 from src.model.preprocess import PosePreprocessor
 from src.utils.adapters import visualizer_adapter
-from src.utils.palettes import (
+from src.visualization.palettes import (
     COCO_KPTS_COLORS,
     COCO_SKELETON_INFO,
     COCO_WHOLEBODY_KPTS_COLORS,

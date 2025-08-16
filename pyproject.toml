@@ -11,13 +11,17 @@ dependencies = [
     "ffmpegcv[cuda]==0.3.18",
     "mmdet==3.3.0",
     "opencv-python==4.8.1.78",
-    "numpy==1.23.5",
+    "numpy==1.26.4",
     "kornia==0.8.1",
     "pandas==2.3.1",
     "pre-commit",
     "setuptools==79.0.1",
     "mmengine==0.10.7",
-    "ultralytics==8.3.170"
+    "ultralytics==8.3.170",
+    "omegaconf==2.3.0",
+    "pyqt6==6.9.1",
+    "pyopengl==3.1.9",
+    "pyopengl-accelerate==3.1.9"
 ]
 
 [project.optional-dependencies]

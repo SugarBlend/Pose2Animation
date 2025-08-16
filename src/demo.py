@@ -3,12 +3,14 @@ from argparse import ArgumentParser, Namespace
 from itertools import count
 from pathlib import Path
 
+import pickle
 import cv2
 import ffmpegcv
 import numpy as np
 import torch
 import yaml
 from colorama import Fore, Style
+from mmcv.visualization.image import imshow_det_bboxes
 from mmpose.apis import init_model as init_pose_estimator
 from mmpose.visualization.fast_visualizer import FastVisualizer
 from tqdm import tqdm
@@ -16,7 +18,7 @@ from tqdm import tqdm
 from src.model.executor import inference_topdown
 from src.model.preprocess import PosePreprocessor
 from src.utils.adapters import GPUArray, pycuda_context_reset, visualizer_adapter
-from src.utils.palettes import (
+from src.visualization.palettes import (
     COCO_KPTS_COLORS,
     COCO_SKELETON_INFO,
     COCO_WHOLEBODY_KPTS_COLORS,
@@ -144,6 +146,7 @@ if __name__ == "__main__":
     detection_thresh = 0.4
     class_thresh = 0
 
+    frame_joints = []
     for i in tqdm(count(), total=frames_number, bar_format=custom_format, position=0, leave=True, ascii=" ▁▂▃▄▅▆▇█",
                   ncols=70):
         if args.use_ffmpegcv:
@@ -170,10 +173,16 @@ if __name__ == "__main__":
         else:
             predictions = []
 
+        frame_joints.append(np.concatenate([predictions[0].keypoints, predictions[0].keypoint_scores.reshape(1, -1, 1)], axis=-1))
+
         if args.visualize or args.output_file:
             img = np.ascontiguousarray(torch_tensor.permute(1, 2, 0).to(torch.uint8).cpu().numpy())
 
             if args.visualize:
+                imshow_det_bboxes(
+                    img, detections[:, :5], labels=detections[:, 5].astype(np.int32), class_names=["person"],
+                    bbox_color=(0, 165, 255), text_color="blue", font_scale=0.5, thickness=3, show=False
+                )
                 for predict in predictions:
                     visualizer.draw_pose(img, predict)
                 cv2.imshow("Visualization", img)
@@ -181,4 +190,9 @@ if __name__ == "__main__":
 
             if args.output_file:
                 writer.write(img)
+
+    args.detections_file = Path(args.detections_file)
+    output_file = f"{args.detections_file.parent.joinpath(args.detections_file.stem)}_skeleton_{model_cfg.num_keypoints}.pkl"
+    with open(output_file, "wb") as pkl_file:
+        pickle.dump(frame_joints, pkl_file)
     cap.release()
